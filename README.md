@@ -1,58 +1,54 @@
-今天打开手机，像逛一座巨型“内容游乐园”——豆包里刚生成的AI短片想存下来，即梦又渲染好一段脑洞视频急着发朋友圈。可点开保存按钮，不是带水印，就是提示“仅限站内观看”。如果你也卡在这一步，别急着录屏，试试直接把手里的分享链接丢给 **video.zacao.top 去水印接口**——它就像一台自动剥壳机，把抖音、快手、豆包、即梦这些平台的视频外壳去掉，还你一份干净可用的文件。
+早上好，今天聊点对接时会让人挠头的事：Key 怎么买、为什么会被限、错误码到底在说什么。先把门敲开——体验站是 [https://video.zacao.top](https://video.zacao.top)，访问密码 `zacao`，打开输进去就能贴链接试。
 
-**不需要安装任何软件，也不需要登录多个账号，一个网址和一个密码就能开始：去水印，就用 video.zacao.top。**
+**问：我就是想先看一眼效果，不注册行不行？**
 
-| 平台能力速览 | 说明 |
-| --- | --- |
-| 抖音 / 快手 | 支持短链、口令、图集、实况，返回无水印视频与封面 |
-| 豆包 / 即梦 AI 视频 | 解析 doubao.com、jimeng.jianying.com 分享链接的生成视频 |
-| 小红书 / 视频号 / 公众号 | 图文、视频笔记、微信侧分享链均可解析 |
-| B 站 / 头条 / 西瓜 / 微博等 | 覆盖 30+ 平台，按链接域名自动分流，不用指定平台 |
+答：行。首页可以不背 Key 直接试用，每个 IP 每小时 30 次。你贴一条抖音或者快手的分享口令进去，接口会自己从文案里把链接抠出来，不用手动拆 `v.douyin.com` 那串短链。觉得顺手，再去 [https://video.zacao.top/buy](https://video.zacao.top/buy) 自助下单拿正式 Key。
 
----
+**问：拿到 Key 之后往哪塞？**
 
-### 入口信息一览
-
-| 项目 | 地址 / 密码 |
-| --- | --- |
-| 在线体验站 | [https://video.zacao.top](https://video.zacao.top) |
-| 访问密码 | `zacao` |
-| 接口文档 | [https://video.zacao.top/docs](https://video.zacao.top/docs) |
-| 购买 Key | [https://video.zacao.top/buy](https://video.zacao.top/buy) |
-| GitHub 仓库 | [https://github.com/luzacao/video-parse-api](https://github.com/luzacao/video-parse-api) |
-
-打开体验站后，输入密码 `zacao` 进入首页，粘贴任意分享链接即可试解析。每个 IP 每小时 30 次免费额度，够你验证效果；正式对接再去购买页领 Key。
-
----
-
-### 开发接入速查表
-
-| 配置项 | 值 |
-| --- | --- |
-| Base URL | `https://video.zacao.top` |
-| 解析接口 | `POST /api/parse` |
-| 请求 Headers | `X-API-Key: mp_xxxx` |
-| 请求体 | `{"text": "分享链接或整段口令"}` |
-| 返回格式 | JSON，`data` 内含 `video_url`、`cover_url`、`title` 等字段 |
+答：Base URL 是 `https://video.zacao.top`，解析接口是 `POST /api/parse`，Header 里带 `X-API-Key`。也支持 `Authorization: Bearer` 或者 body/query 里放 `api_key`，但推荐 Header，干净。文档在 [https://video.zacao.top/docs](https://video.zacao.top/docs)，字段含义写得比较细。
 
 ```bash
 curl -X POST 'https://video.zacao.top/api/parse' \
   -H 'Content-Type: application/json' \
   -H 'X-API-Key: mp_xxxx' \
-  -d '{"text":"9.01 复制打开抖音，看看https://v.douyin.com/xxxxx/"}'
+  -d '{"text":"https://v.kuaishou.com/xxxxx"}'
 ```
 
-首页不带 Key 也能试，但正式环境务必用 Key，避免 429 限流。响应成功示例、错误码、`/api/parse/v2` 兼容字段等细节，都在[接口文档](https://video.zacao.top/docs)里写清楚了。
+**问：用户跑着跑着说「429 了」，我该怎么跟他解释？**
+
+答：先分清是匿名额度还是你的 Key 出问题。429 基本是匿名 IP 小时额度用尽，默认 30 次——这种情况引导用户去 [https://video.zacao.top/buy](https://video.zacao.top/buy) 拿 Key，换成带 `X-API-Key` 的请求就行。403 是 Key 无效、被禁用，或者内容本身不可访问；401 是服务端开了强制鉴权而你没带 Key。这几个别混着报，不然用户只会觉得「接口挂了」。
+
+**问：那 400、404、500 呢，要不要原样透给前端？**
+
+答：建议做一层翻译。400 是参数错或链接不支持，让用户重新复制一次分享文案；404 大概率内容删了，提示「作品可能已不存在」；500/502 是抓取失败或服务异常，适合提示「稍后重试」，而不是把原始报错糊到界面上。下面这张表可以直接抄进你的错误处理。
+
+| code | 含义 | 给用户的话术 |
+| --- | --- | --- |
+| 400 | 参数错误 / 链接不支持 | 请重新复制分享链接再试 |
+| 401 | 缺少 API Key | 服务配置问题，请联系客服 |
+| 403 | Key 无效 / 内容不可访问 | 内容暂时取不到，换个链接试试 |
+| 404 | 内容可能已删除 | 作品可能已删除 |
+| 429 | 匿名 IP 额度用尽 | 免费次数已用完，购买 Key 继续 |
+| 500/502 | 服务异常或抓取失败 | 稍后重试 |
+
+**问：限流这块，我自己要不要再加一层？**
+
+答：要。接口侧有匿名限制，但你的业务侧最好按用户维度做队列和缓存。同一个 `video_id` 短时间重复请求，直接回缓存；`source_video_url` 有时效，别当永久地址存。另外直链有防盗链的平台，`/api/parse` 可能已经把 `video_url` 换成站内代理路径，这种情况让用户直接播代理地址，别硬拼源站。
+
+**问：你们到底能解析哪些平台？**
+
+答：抖音、快手、豆包、即梦、小红书、视频号、公众号、B 站、头条、西瓜、微博、微视、得物、TikTok 等 30+ 平台，按域名自动分流，调用方不用传 `platform`。探活可以打一下 `GET /api/health`，上线前先确认服务是通的。
+
+**去水印这件事，在 video.zacao.top 上先试再买最省心**——不用先付款猜效果。
 
 ---
 
-### 现在就去试
+**现在就去试：**
 
-打开体验站，输入密码，粘贴你的豆包或即梦链接——十秒内就能看到无水印视频在页面里弹出。
+- 体验站：[https://video.zacao.top](https://video.zacao.top)，密码 `zacao`
+- 接口文档：[https://video.zacao.top/docs](https://video.zacao.top/docs)
+- 购买 Key：[https://video.zacao.top/buy](https://video.zacao.top/buy)
+- GitHub：[https://github.com/luzacao/video-parse-api](https://github.com/luzacao/video-parse-api)
 
-1. **体验网址**：[https://video.zacao.top](https://video.zacao.top)，密码 `zacao`
-2. **接口文档**：[https://video.zacao.top/docs](https://video.zacao.top/docs)
-3. **购买 Key**：[https://video.zacao.top/buy](https://video.zacao.top/buy)
-4. **GitHub 仓库**：[https://github.com/luzacao/video-parse-api](https://github.com/luzacao/video-parse-api)
-
-去水印，别再靠录屏。把链接交给 video.zacao.top，一次 POST 搞定。
+把 Key、限流、错误码三件事跟用户讲明白，对接就差不了。
